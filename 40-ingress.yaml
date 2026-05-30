@@ -1,0 +1,42 @@
+# Cluster-wide Tailscale Ingress definitions for jellyfin + immich.
+#
+# Each Ingress creates its own Tailscale node (auto-HTTPS at
+# https://<host>.<tailnet>.ts.net). The IngressClass `tailscale` itself
+# is created by the Tailscale operator — install that AFTER cluster-setup
+# (see ../README.md "What this does NOT install").
+#
+# These Ingresses are placed here, not in the app repos, because they're
+# the shared entry-points for the cluster's two anchor services. App-specific
+# Ingresses (chores, reminders, etc.) live in those app repos.
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: jellyfin
+  namespace: ${HOMELAB_NAMESPACE}
+spec:
+  ingressClassName: tailscale
+  defaultBackend:
+    service:
+      name: jellyfin
+      port:
+        number: 8096
+  tls:
+    - hosts:
+        - jellyfin
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: immich
+  namespace: ${HOMELAB_NAMESPACE}
+spec:
+  ingressClassName: tailscale
+  defaultBackend:
+    service:
+      name: immich-server
+      port:
+        number: 2283
+  tls:
+    - hosts:
+        - immich

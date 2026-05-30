@@ -1,0 +1,440 @@
+# Tiered Storage Mover — ConfigMap + two CronJobs (immich & jellyfin)
+#
+# Moves large files from local-path SSD PVCs to the external HDD
+# (${HOMELAB_TIER_HDD_PATH}) when the HDD is connected.
+#
+# *** TRIGGER MODEL: MANUAL ONLY (or via webapp) ***
+# Both CronJobs are suspended: true.  The schedule exists for future
+# automation.  Trigger manually via ~/homelab/tier-now.sh, or have the
+# webapp run:
+#   kubectl create job --from=cronjob/tier-mover-immich   tier-immich-<ts>   -n homelab
+#   kubectl create job --from=cronjob/tier-mover-jellyfin tier-jellyfin-<ts> -n homelab
+#
+# The script reads APP=immich|jellyfin from the CronJob env and processes
+# only that one app.  This makes each CronJob independently triggerable.
+#
+# SSD hostPath discovery command (re-run if PVCs are ever recreated):
+#   kubectl get pv -o jsonpath='{range .items[?(@.spec.claimRef.name=="immich-upload-localpath-pvc")]}{.spec.local.path}{end}'
+#   kubectl get pv -o jsonpath='{range .items[?(@.spec.claimRef.name=="jellyfin-media-localpath-pvc")]}{.spec.local.path}{end}'
+#
+# Hardcoded paths as of 2026-05-30 (PVC UUIDs are stable until PVC recreation):
+#   immich-upload-localpath-pvc  → pvc-17ce78b9-de1e-4fe7-b2f0-214c599795d9
+#   jellyfin-media-localpath-pvc → pvc-663f38f5-a625-4dfb-bb7a-7b4e1442c1c2
+#
+# PREREQUISITE: HDD must be mounted at ${HOMELAB_TIER_HDD_PATH} with subdirs:
+#   ${HOMELAB_TIER_HDD_PATH}/immich-library/
+#   ${HOMELAB_TIER_HDD_PATH}/jellyfin-media/
+# AND the Helm patches in storage-tier/helm-value-patches.md must be applied
+# so the app pods have /data-hdd and /media-hdd mounts visible to them.
+#
+# Apply: kubectl apply -f ~/homelab/tiered-storage-mover.yaml
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tiered-storage-mover-script
+  namespace: ${HOMELAB_NAMESPACE}
+data:
+  mover.sh: |
+    #!/bin/sh
+    # busybox ash (Alpine's /bin/sh): pipefail is supported, process substitution
+    # is NOT. Counters use /tmp files; find results use /tmp/filelist to avoid
+    # the | while subshell and < <(...) respectively.
+    set -eu
+
+    # ---------------------------------------------------------------------------
+    # APP selection — must be set by the calling CronJob
+    # ---------------------------------------------------------------------------
+    if [ -z "${APP:-}" ]; then
+      echo "ERROR: APP env var is not set. Must be 'immich' or 'jellyfin'."
+      exit 1
+    fi
+    case "$APP" in
+      immich|jellyfin) ;;
+      *)
+        echo "ERROR: APP='${APP}' is not valid. Must be 'immich' or 'jellyfin'."
+        exit 1
+        ;;
+    esac
+    echo "=== Tiered Storage Mover: APP=${APP} ==="
+
+    # ---------------------------------------------------------------------------
+    # Paths
+    #
+    # Mover-pod SSD mounts (hostPath of local-path PVCs):
+    #   /ssd-immich   →  pvc-17ce78b9-..._homelab_immich-upload-localpath-pvc
+    #   /ssd-jellyfin →  pvc-663f38f5-..._homelab_jellyfin-media-localpath-pvc
+    #
+    # Mover-pod HDD mounts (hostPath of ${HOMELAB_TIER_HDD_PATH}/*):
+    #   /hdd-immich   →  ${HOMELAB_TIER_HDD_PATH}/immich-library
+    #   /hdd-jellyfin →  ${HOMELAB_TIER_HDD_PATH}/jellyfin-media
+    #
+    # App-pod HDD mount paths (what symlinks must TARGET — paths inside the APP
+    # pods, not in this mover pod):
+    #   Immich server: /data-hdd  (→ ${HOMELAB_TIER_HDD_PATH}/immich-library)
+    #   Jellyfin:      /media-hdd (→ ${HOMELAB_TIER_HDD_PATH}/jellyfin-media)
+    # ---------------------------------------------------------------------------
+
+    IMMICH_SSD=/ssd-immich
+    IMMICH_HDD=/hdd-immich
+    IMMICH_POD_HDD=/data-hdd       # path as seen inside the Immich server pod
+    IMMICH_THRESHOLD_BYTES=2147483648   # 2 GiB
+
+    JELLYFIN_SSD=/ssd-jellyfin
+    JELLYFIN_HDD=/hdd-jellyfin
+    JELLYFIN_POD_HDD=/media-hdd    # path as seen inside the Jellyfin pod
+    JELLYFIN_THRESHOLD_BYTES=3221225472  # 3 GiB
+
+    # ---------------------------------------------------------------------------
+    # Counters are tracked in /tmp files to survive the | while subshell.
+    # Each counter file holds a single integer; inc_counter/read_counter
+    # manipulate them atomically (single-process, no lock needed).
+    # ---------------------------------------------------------------------------
+    init_counters() {
+      local prefix="$1"
+      for c in moved bytes failed skipped; do
+        printf '0' > "/tmp/${prefix}_${c}"
+      done
+    }
+
+    inc_counter() {
+      local file="/tmp/${1}_${2}"
+      local cur
+      cur="$(cat "$file")"
+      printf '%s' "$(( cur + $3 ))" > "$file"
+    }
+
+    read_counter() {
+      cat "/tmp/${1}_${2}"
+    }
+
+    init_counters "$APP"
+
+    # ---------------------------------------------------------------------------
+    # move_file <ssd_file> <hdd_dir> <pod_hdd_mount> <rel_prefix> <app>
+    #   ssd_file      — absolute path on the SSD mount
+    #   hdd_dir       — mover-pod's HDD mount root (e.g. /hdd-immich)
+    #   pod_hdd_mount — path inside the APP pod where the HDD is mounted
+    #   rel_prefix    — subdir under both src and dst (e.g. library)
+    #   app           — counter namespace: "immich" or "jellyfin"
+    # ---------------------------------------------------------------------------
+    move_file() {
+      local ssd_file="$1"
+      local hdd_dir="$2"
+      local pod_hdd_mount="$3"
+      local rel_prefix="$4"
+      local app="$5"
+
+      local ssd_src
+      [ "$app" = "immich" ] && ssd_src="${IMMICH_SSD}" || ssd_src="${JELLYFIN_SSD}"
+      local base_dir="${ssd_src}/${rel_prefix}"
+      local rel_path="${ssd_file#${base_dir}/}"
+
+      local hdd_dest="${hdd_dir}/${rel_prefix}/${rel_path}"
+      local hdd_dest_dir
+      hdd_dest_dir="$(dirname "$hdd_dest")"
+      local pod_target="${pod_hdd_mount}/${rel_prefix}/${rel_path}"
+      local tmplink="${ssd_file}.tmplink"
+      local file_size
+      file_size="$(stat -c%s "$ssd_file" 2>/dev/null || echo 0)"
+
+      # Already a symlink — skip (idempotent: file already moved)
+      if [ -L "$ssd_file" ]; then
+        echo "SKIP already-symlinked ${ssd_file}"
+        inc_counter "$app" skipped 1
+        return 0
+      fi
+
+      # HDD copy already exists but SSD is not yet a symlink (partial previous run)
+      if [ -f "$hdd_dest" ]; then
+        echo "SKIP hdd-already-exists ${ssd_file}"
+        inc_counter "$app" skipped 1
+        return 0
+      fi
+
+      # Create destination directory tree on HDD
+      mkdir -p "$hdd_dest_dir"
+
+      # Copy to HDD (busybox cp: -p preserves mtime/owner/mode; GNU's
+      # --preserve=timestamps long-option is unavailable on Alpine)
+      if ! cp -p "$ssd_file" "$hdd_dest"; then
+        echo "FAIL cp-error ${ssd_file}"
+        inc_counter "$app" failed 1
+        rm -f "$hdd_dest"
+        return 0
+      fi
+
+      # Integrity check via sha256sum
+      local src_hash dst_hash
+      src_hash="$(sha256sum "$ssd_file" | awk '{print $1}')"
+      dst_hash="$(sha256sum "$hdd_dest" | awk '{print $1}')"
+      if [ "$src_hash" != "$dst_hash" ]; then
+        echo "FAIL sha256-mismatch ${ssd_file} (src=${src_hash} dst=${dst_hash})"
+        inc_counter "$app" failed 1
+        rm -f "$hdd_dest"
+        return 0
+      fi
+
+      # Create symlink at <original>.tmplink whose TARGET is the app-pod HDD path
+      # (not the mover pod's /hdd-* path — symlinks are followed by the app pod
+      # where the HDD is mounted at $pod_hdd_mount, not at /hdd-*)
+      if ! ln -sf "$pod_target" "$tmplink"; then
+        echo "FAIL symlink-create ${ssd_file}"
+        inc_counter "$app" failed 1
+        rm -f "$hdd_dest"
+        return 0
+      fi
+
+      # Atomic rename: replaces the original file with the symlink.
+      # busybox mv has no -T flag, but when dest exists as a regular file
+      # (which $ssd_file always is here), mv calls rename(2) directly —
+      # already atomic. -f suppresses any interactive prompt.
+      if ! mv -f "$tmplink" "$ssd_file"; then
+        echo "FAIL atomic-rename ${ssd_file}"
+        inc_counter "$app" failed 1
+        rm -f "$tmplink" "$hdd_dest"
+        return 0
+      fi
+
+      # Post-move verification: confirm target exists via mover's HDD mount
+      local verify_path="${hdd_dir}/${rel_prefix}/${rel_path}"
+      if [ ! -f "$verify_path" ]; then
+        local link_target
+        link_target="$(readlink "$ssd_file")"
+        echo "FAIL post-verify-missing ${ssd_file} -> ${link_target} (checked ${verify_path})"
+        inc_counter "$app" failed 1
+        return 0
+      fi
+
+      echo "MOVED ${ssd_file} size=${file_size} -> ${pod_target}"
+      inc_counter "$app" moved 1
+      inc_counter "$app" bytes "$file_size"
+    }
+
+    FILELIST=/tmp/mover_filelist
+
+    # ---------------------------------------------------------------------------
+    # Dispatch on APP
+    # ---------------------------------------------------------------------------
+    if [ "$APP" = "immich" ]; then
+      # Process Immich: library/ and encoded-video/ only.
+      # Skip upload/ (in-flight files) and thumbs/ (regenerable, write-heavy).
+      echo "=== Immich: scanning library/ and encoded-video/ ==="
+      for subdir in library encoded-video; do
+        src_dir="${IMMICH_SSD}/${subdir}"
+        if [ ! -d "$src_dir" ]; then
+          echo "SKIP dir-missing ${src_dir}"
+          inc_counter immich skipped 1
+          continue
+        fi
+        # Collect candidates into a tmpfile so the while loop runs in the main
+        # shell (not a subshell) and can update /tmp counter files cleanly.
+        # -size +Nc means "strictly more than N bytes" (c = bytes suffix in find)
+        find "$src_dir" \
+          -type f \
+          ! -type l \
+          -size "+${IMMICH_THRESHOLD_BYTES}c" \
+          ! -name '._*' \
+          ! -name '.DS_Store' \
+          > "$FILELIST" || true
+        while IFS= read -r f; do
+          move_file "$f" "$IMMICH_HDD" "$IMMICH_POD_HDD" "$subdir" "immich"
+        done < "$FILELIST"
+      done
+      rm -f "$FILELIST"
+      echo "SUMMARY immich moved=$(read_counter immich moved) bytes=$(read_counter immich bytes) failed=$(read_counter immich failed) skipped=$(read_counter immich skipped)"
+
+    elif [ "$APP" = "jellyfin" ]; then
+      # Process Jellyfin: movies/, tvshows/, music/
+      echo "=== Jellyfin: scanning movies/, tvshows/, music/ ==="
+      for subdir in movies tvshows music; do
+        src_dir="${JELLYFIN_SSD}/${subdir}"
+        if [ ! -d "$src_dir" ]; then
+          echo "SKIP dir-missing ${src_dir}"
+          inc_counter jellyfin skipped 1
+          continue
+        fi
+        find "$src_dir" \
+          -type f \
+          ! -type l \
+          -size "+${JELLYFIN_THRESHOLD_BYTES}c" \
+          ! -name '._*' \
+          ! -name '.DS_Store' \
+          > "$FILELIST" || true
+        while IFS= read -r f; do
+          move_file "$f" "$JELLYFIN_HDD" "$JELLYFIN_POD_HDD" "$subdir" "jellyfin"
+        done < "$FILELIST"
+      done
+      rm -f "$FILELIST"
+      echo "SUMMARY jellyfin moved=$(read_counter jellyfin moved) bytes=$(read_counter jellyfin bytes) failed=$(read_counter jellyfin failed) skipped=$(read_counter jellyfin skipped)"
+    fi
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tiered-storage-mover
+  namespace: ${HOMELAB_NAMESPACE}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: tier-mover-immich
+  namespace: ${HOMELAB_NAMESPACE}
+spec:
+  # Suspended: schedule is here for future automation only. Trigger
+  # manually via ~/homelab/tier-now.sh immich, or via webapp:
+  #   kubectl create job --from=cronjob/tier-mover-immich tier-immich-<ts> -n homelab
+  # To enable daily runs later: kubectl patch cronjob tier-mover-immich \
+  #   -n homelab -p '{"spec":{"suspend":false}}'
+  suspend: true
+  schedule: "0 3 * * *"
+  timeZone: "Europe/London"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: tiered-storage-mover
+          restartPolicy: OnFailure
+          securityContext:
+            runAsUser: 0
+
+          containers:
+            - name: mover
+              image: alpine:3.20
+              command: ["/bin/sh", "/scripts/mover.sh"]
+              env:
+                - name: APP
+                  value: "immich"
+
+              resources:
+                requests:
+                  memory: "256Mi"
+                  cpu: "200m"
+                limits:
+                  memory: "512Mi"
+                  cpu: "500m"
+
+              volumeMounts:
+                # ---------------------------------------------------------------
+                # SSD side — mounts the raw hostPath directory of the local-path
+                # PVC.  Stable as long as the PVC is not recreated.
+                # If recreated, update the hostPath below and in the comment at
+                # the top of this file.
+                # ---------------------------------------------------------------
+                - name: ssd-immich
+                  mountPath: /ssd-immich
+
+                # ---------------------------------------------------------------
+                # HDD side — the new HFS+ disk at ${HOMELAB_TIER_HDD_PATH}.
+                # type: "" required (see memory: OrbStack HDD mount fd limit).
+                # Pre-create the directory on macOS before applying this YAML.
+                # ---------------------------------------------------------------
+                - name: hdd-immich
+                  mountPath: /hdd-immich
+
+                - name: script
+                  mountPath: /scripts
+
+          volumes:
+            # SSD — local-path PVC storage directory (hardcoded UUID, see above)
+            - name: ssd-immich
+              hostPath:
+                # immich-upload-localpath-pvc, PV pvc-17ce78b9-de1e-4fe7-b2f0-214c599795d9
+                path: /var/lib/rancher/k3s/storage/pvc-17ce78b9-de1e-4fe7-b2f0-214c599795d9_homelab_immich-upload-localpath-pvc
+                type: Directory
+
+            # HDD — HFS+ disk, type: "" (no DirectoryOrCreate — see learnings)
+            - name: hdd-immich
+              hostPath:
+                path: ${HOMELAB_TIER_HDD_PATH}/immich-library
+                type: ""
+
+            - name: script
+              configMap:
+                name: tiered-storage-mover-script
+                defaultMode: 0755
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: tier-mover-jellyfin
+  namespace: ${HOMELAB_NAMESPACE}
+spec:
+  # Suspended: schedule is here for future automation only. Trigger
+  # manually via ~/homelab/tier-now.sh jellyfin, or via webapp:
+  #   kubectl create job --from=cronjob/tier-mover-jellyfin tier-jellyfin-<ts> -n homelab
+  # To enable daily runs later: kubectl patch cronjob tier-mover-jellyfin \
+  #   -n homelab -p '{"spec":{"suspend":false}}'
+  suspend: true
+  schedule: "0 3 * * *"
+  timeZone: "Europe/London"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: tiered-storage-mover
+          restartPolicy: OnFailure
+          securityContext:
+            runAsUser: 0
+
+          containers:
+            - name: mover
+              image: alpine:3.20
+              command: ["/bin/sh", "/scripts/mover.sh"]
+              env:
+                - name: APP
+                  value: "jellyfin"
+
+              resources:
+                requests:
+                  memory: "256Mi"
+                  cpu: "200m"
+                limits:
+                  memory: "512Mi"
+                  cpu: "500m"
+
+              volumeMounts:
+                # ---------------------------------------------------------------
+                # SSD side — mounts the raw hostPath directory of the local-path
+                # PVC.  Stable as long as the PVC is not recreated.
+                # If recreated, update the hostPath below and in the comment at
+                # the top of this file.
+                # ---------------------------------------------------------------
+                - name: ssd-jellyfin
+                  mountPath: /ssd-jellyfin
+
+                # ---------------------------------------------------------------
+                # HDD side — the new HFS+ disk at ${HOMELAB_TIER_HDD_PATH}.
+                # type: "" required (see memory: OrbStack HDD mount fd limit).
+                # Pre-create the directory on macOS before applying this YAML.
+                # ---------------------------------------------------------------
+                - name: hdd-jellyfin
+                  mountPath: /hdd-jellyfin
+
+                - name: script
+                  mountPath: /scripts
+
+          volumes:
+            # SSD — local-path PVC storage directory (hardcoded UUID, see above)
+            - name: ssd-jellyfin
+              hostPath:
+                # jellyfin-media-localpath-pvc, PV pvc-663f38f5-a625-4dfb-bb7a-7b4e1442c1c2
+                path: /var/lib/rancher/k3s/storage/pvc-663f38f5-a625-4dfb-bb7a-7b4e1442c1c2_homelab_jellyfin-media-localpath-pvc
+                type: Directory
+
+            # HDD — HFS+ disk, type: "" (no DirectoryOrCreate — see learnings)
+            - name: hdd-jellyfin
+              hostPath:
+                path: ${HOMELAB_TIER_HDD_PATH}/jellyfin-media
+                type: ""
+
+            - name: script
+              configMap:
+                name: tiered-storage-mover-script
+                defaultMode: 0755

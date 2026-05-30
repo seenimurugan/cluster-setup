@@ -1,0 +1,26 @@
+# Namespaces for the homelab cluster.
+# Applied by deploy.sh after envsubst.
+#
+# The "tailscale" namespace is created so the separate tailscale-operator
+# app repo (run after cluster-setup) can install into it without extra steps.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ${HOMELAB_NAMESPACE}
+  labels:
+    app.kubernetes.io/part-of: homelab
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    app.kubernetes.io/part-of: homelab
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tailscale
+  labels:
+    app.kubernetes.io/part-of: homelab

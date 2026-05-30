@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Template — processed by ../deploy.sh via envsubst.
+  After templating, this file is written to:
+    ${USER_HOME}/Library/LaunchAgents/com.${USER_NAME}.homelab-backup.plist
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.${USER_NAME}.homelab-backup</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>${CLUSTER_SETUP_DIR}/scripts/backup-immich.sh</string>
+    </array>
+
+    <!-- Weekly: every Sunday at 03:00 -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Weekday</key><integer>0</integer>
+        <key>Hour</key><integer>3</integer>
+        <key>Minute</key><integer>0</integer>
+    </dict>
+
+    <!-- If the Mac was asleep at scheduled time, run on wake -->
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>${CLUSTER_SETUP_DIR}/scripts/backup.out.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>${CLUSTER_SETUP_DIR}/scripts/backup.err.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <key>KUBECONFIG</key>
+        <string>${USER_HOME}/.kube/config</string>
+    </dict>
+
+    <key>WorkingDirectory</key>
+    <string>${CLUSTER_SETUP_DIR}</string>
+</dict>
+</plist>

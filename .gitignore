@@ -1,0 +1,19 @@
+.env
+.env.local
+.env.*.local
+.DS_Store
+*.log
+backups/
+
+# Per-script logs that the homelab scripts write next to themselves
+scripts/*.log
+scripts/*.out.log
+scripts/*.err.log
+scripts/uploads/
+scripts/backup.log
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.swp

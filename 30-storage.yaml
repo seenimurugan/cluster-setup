@@ -1,0 +1,110 @@
+# Homelab persistent storage — HDD-backed PVs and PVCs.
+#
+# Strategy (HDD is exFAT — see docs/learnings.md):
+#   - HDD (hostPath PVs, storageClassName: local-hdd):
+#       * jellyfin-media-pv   → ${HOMELAB_HDD_PATH}/jellyfin/media
+#       * jellyfin-config-pv  → ${HOMELAB_HDD_PATH}/jellyfin/config
+#       * immich-upload-pv    → ${HOMELAB_HDD_PATH}/immich/upload
+#   - VM-local (local-path StorageClass, ext4 inside OrbStack VM):
+#       * Postgres PVC requested by Immich Helm chart with storageClassName: local-path
+#       * local-path StorageClass is shipped with k3s — no definition needed here.
+#
+# Note: local-hdd is NOT a real StorageClass — there is no provisioner. PVs use
+# hostPath and are claimed by name+selector. The "local-hdd" string is a label
+# that links the PVCs in this file to the matching PVs.
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: jellyfin-media-pv
+  labels:
+    app: jellyfin
+    purpose: media
+spec:
+  capacity:
+    storage: 2Ti
+  accessModes: [ReadWriteOnce]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-hdd
+  hostPath:
+    path: ${HOMELAB_HDD_PATH}/jellyfin/media
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jellyfin-media-pvc
+  namespace: ${HOMELAB_NAMESPACE}
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-hdd
+  resources:
+    requests:
+      storage: 2Ti
+  selector:
+    matchLabels:
+      app: jellyfin
+      purpose: media
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: jellyfin-config-pv
+  labels:
+    app: jellyfin
+    purpose: config
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes: [ReadWriteOnce]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-hdd
+  hostPath:
+    path: ${HOMELAB_HDD_PATH}/jellyfin/config
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jellyfin-config-pvc
+  namespace: ${HOMELAB_NAMESPACE}
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-hdd
+  resources:
+    requests:
+      storage: 5Gi
+  selector:
+    matchLabels:
+      app: jellyfin
+      purpose: config
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: immich-upload-pv
+  labels:
+    app: immich
+    purpose: upload
+spec:
+  capacity:
+    storage: 1Ti
+  accessModes: [ReadWriteOnce]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-hdd
+  hostPath:
+    path: ${HOMELAB_HDD_PATH}/immich/upload
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: immich-upload-pvc
+  namespace: ${HOMELAB_NAMESPACE}
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-hdd
+  resources:
+    requests:
+      storage: 1Ti
+  selector:
+    matchLabels:
+      app: immich
+      purpose: upload
