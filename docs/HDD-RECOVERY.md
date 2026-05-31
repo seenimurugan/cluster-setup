@@ -4,6 +4,8 @@
 >
 > That means HDD-missing is no longer a P0 outage — the apps keep working. Only the backup job fails. Most of this runbook is still useful for the eventual re-mount, but you can take it at your own pace.
 
+**On this page:** [Symptoms](#symptoms) · [Step-by-step recovery](#step-by-step-recovery) · [Optional: pause the photo pods while the HDD is unplugged](#optional-pause-the-photo-pods-while-the-hdd-is-unplugged) · [Why this happens](#why-this-happens) · [Prevention](#prevention) · [Quick reference](#quick-reference)
+
 ## Symptoms
 
 You'll know the HDD is gone if you see any of:

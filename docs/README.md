@@ -2,6 +2,8 @@
 
 Self-hosted homelab on Nila's Mac running OrbStack k3s. All captured knowledge lives in this folder.
 
+**On this page:** [Documentation index](#documentation-index) · [Workflow](#workflow) · [Where files live](#where-files-live) · [Adding new informational content](#adding-new-informational-content)
+
 ## Documentation index
 
 ### Apps (grouped per-app — usage + maintenance + troubleshooting)

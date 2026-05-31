@@ -2,6 +2,8 @@
 
 Everything you need to operate the homelab without Claude. Read top-down when something's wrong; jump to specific sections for routine tasks.
 
+**On this page:** [0. Quick health check (run first when anything seems wrong)](#0-quick-health-check-run-first-when-anything-seems-wrong) · [1. After a Mac reboot — what auto-recovers](#1-after-a-mac-reboot--what-auto-recovers) · [2. Where everything lives](#2-where-everything-lives) · [3. Restart things (smallest to biggest blast radius)](#3-restart-things-smallest-to-biggest-blast-radius) · [4. Scale things](#4-scale-things) · [5. Where to find logs](#5-where-to-find-logs) · [6. Stuck things — diagnosis flowchart](#6-stuck-things--diagnosis-flowchart) · [7. Routine tasks](#7-routine-tasks) · [8. Reach the services](#8-reach-the-services) · [9. Managing content on the docs site](#9-managing-content-on-the-docs-site) · [10. The "everything broke, start over" nuclear option](#10-the-everything-broke-start-over-nuclear-option) · [11. Cheat sheet — most-used commands](#11-cheat-sheet--most-used-commands)
+
 ---
 
 ## 0. Quick health check (run first when anything seems wrong)
