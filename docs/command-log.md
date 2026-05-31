@@ -2,6 +2,8 @@
 
 Every command run during homelab setup, in order. Includes timestamps, output summary, and notes.
 
+**On this page:** [Session: 2026-05-26 — Step 1 setup begins](#session-2026-05-26--step-1-setup-begins) · [Step 1 — Install tooling](#step-1--install-tooling) · [Step 2 — Enable Kubernetes in OrbStack](#step-2--enable-kubernetes-in-orbstack) · [Step 3 — Prepare HDD directories + filesystem check](#step-3--prepare-hdd-directories-+-filesystem-check) · [Step 4 — Namespace and StorageClass](#step-4--namespace-and-storageclass) · [Step 5 — PersistentVolumes and Claims](#step-5--persistentvolumes-and-claims) · [Step 6 — Deploy Jellyfin](#step-6--deploy-jellyfin) · [Step 7 — Deploy Immich](#step-7--deploy-immich) · [Step 8 — Tailscale + port-forward + launchd](#step-8--tailscale-+-port-forward-+-launchd) · [Step 9 — Migration: Pattern A → Pattern B (Tailscale in-cluster)](#step-9--migration-pattern-a--pattern-b-tailscale-in-cluster)
+
 ---
 
 ## Session: 2026-05-26 — Step 1 setup begins

@@ -2,6 +2,8 @@
 
 **Last updated:** 2026-05-26 (Pattern B migration complete)
 
+**On this page:** [What's running](#whats-running) · [Mac state](#mac-state) · [Storage layout (unchanged)](#storage-layout-unchanged) · [Config files](#config-files) · [What's left for the user (manual)](#whats-left-for-the-user-manual) · [Backup TODO (deferred)](#backup-todo-deferred)
+
 ## What's running
 
 | Component | Status | Endpoint |

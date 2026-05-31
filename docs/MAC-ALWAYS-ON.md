@@ -7,6 +7,8 @@ The homelab runs on this MacBook Pro. If the Mac sleeps:
 
 This page fixes the sleep + suspend behaviour so the Mac stays a 24/7 home server while plugged in. Battery behaviour is unchanged.
 
+**On this page:** [TL;DR — the 5 commands](#tl;dr--the-5-commands) · [How `pmset` flags work](#how-`pmset`-flags-work) · [What sleep modes still happen](#what-sleep-modes-still-happen) · [Clamshell mode (closed lid)](#clamshell-mode-closed-lid) · [OrbStack-specific](#orbstack-specific) · [Tailscale-specific](#tailscale-specific) · [Verify everything stays up across a fake sleep cycle](#verify-everything-stays-up-across-a-fake-sleep-cycle) · [Change later — battery-only sleep / split AC vs battery / full revert](#change-later--battery-only-sleep--split-ac-vs-battery--full-revert) · [Battery considerations](#battery-considerations) · [Quick reference](#quick-reference)
+
 ---
 
 ## TL;DR — the 5 commands

@@ -2,6 +2,8 @@
 
 Tribal knowledge captured during setup. Update SKILL.md when these become reusable rules.
 
+**On this page:** [2026-05-26](#2026-05-26) · [2026-05-26 — Migration to Pattern B (Tailscale in-cluster)](#2026-05-26--migration-to-pattern-b-tailscale-in-cluster) · [2026-05-27 — Migration off the HDD (Immich ENFILE root cause)](#2026-05-27--migration-off-the-hdd-immich-enfile-root-cause) · [2026-05-28](#2026-05-28)
+
 ---
 
 ## 2026-05-26

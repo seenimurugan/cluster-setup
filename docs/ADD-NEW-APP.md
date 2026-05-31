@@ -4,6 +4,8 @@ Generic runbook for deploying any new app to the cluster — pre-built (Grocy, L
 
 The end result: app accessible at `https://<name>.stoat-perch.ts.net` from any Tailscale device, optionally at `http://localhost:<port>` from this Mac and `http://192.168.68.57:<port>` on the LAN.
 
+**On this page:** [When to use each pattern](#when-to-use-each-pattern) · [§1 — Deploy a pre-built image (simplest)](#1--deploy-a-pre-built-image-simplest) · [§2 — Deploy your own code (Java/Python/Node/Go/…)](#2--deploy-your-own-code-javapythonnodego) · [§3 — Add a database for the app](#3--add-a-database-for-the-app) · [§4 — Tailscale Ingress (HTTPS from any device on your tailnet)](#4--tailscale-ingress-https-from-any-device-on-your-tailnet) · [§5 — LAN + localhost access (optional)](#5--lan-+-localhost-access-optional) · [§6 — Test, then add to docs](#6--test-then-add-to-docs) · [§6b — Monitoring (logs & metrics)](#6b--monitoring-logs--metrics) · [§7 — Updating an app to a newer version](#7--updating-an-app-to-a-newer-version) · [§8 — Removing an app](#8--removing-an-app) · [Worked example: deploying Grocy (inventory app)](#worked-example-deploying-grocy-inventory-app)
+
 ---
 
 ## When to use each pattern

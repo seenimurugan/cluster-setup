@@ -2,6 +2,8 @@
 
 How databases work in this homelab, and which apps use what.
 
+**On this page:** [What you have](#what-you-have) · [SQLite — what it actually is](#sqlite--what-it-actually-is) · [Why some apps use Postgres and others use SQLite](#why-some-apps-use-postgres-and-others-use-sqlite) · [Inspect a database](#inspect-a-database) · [Backup approaches](#backup-approaches) · [Adding a new app — pick the right DB](#adding-a-new-app--pick-the-right-db)
+
 ## What you have
 
 | App | DB engine | Where the data lives |

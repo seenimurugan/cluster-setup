@@ -4,6 +4,8 @@ The Excalidraw diagram is at `architecture.excalidraw`. Open it at https://excal
 
 This doc walks through every box and arrow so the diagram makes sense without me explaining over your shoulder.
 
+**On this page:** [The big picture](#the-big-picture) · [Layers (outside → in)](#layers-outside--in) · [What each box does](#what-each-box-does) · [The two access paths](#the-two-access-paths) · [The storage strategy (post-2026-05-27 migration)](#the-storage-strategy-post-2026-05-27-migration) · [The control plane (color: purple dashed arrows in diagram)](#the-control-plane-color-purple-dashed-arrows-in-diagram) · [What's NOT in this diagram (intentionally)](#whats-not-in-this-diagram-intentionally) · [How to extend the diagram](#how-to-extend-the-diagram)
+
 ---
 
 ## The big picture
