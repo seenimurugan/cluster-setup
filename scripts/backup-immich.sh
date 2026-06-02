@@ -26,7 +26,7 @@ fi
 # CONFIG
 # ============================================================================
 NAMESPACE="${HOMELAB_NAMESPACE:-homelab}"
-HDD_BACKUP_ROOT="${HOMELAB_HDD_PATH:-/Volumes/Seeni's HDD}/backups"
+HDD_BACKUP_ROOT="${HOMELAB_HDD_PATH:-/Volumes/homelab-backup-hdd}/backups"
 KEEP_FULL=2          # Immich & Jellyfin tar backups to retain
 KEEP_PG=8            # Postgres dumps to retain
 KUBECTL="${KUBECTL_BIN:-/opt/homebrew/bin/kubectl}"

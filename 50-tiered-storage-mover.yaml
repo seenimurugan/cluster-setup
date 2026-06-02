@@ -13,13 +13,13 @@
 # The script reads APP=immich|jellyfin from the CronJob env and processes
 # only that one app.  This makes each CronJob independently triggerable.
 #
-# SSD hostPath discovery command (re-run if PVCs are ever recreated):
+# SSD hostPath discovery command (Immich uses local-path PVC; Jellyfin uses direct hostPath PV):
 #   kubectl get pv -o jsonpath='{range .items[?(@.spec.claimRef.name=="immich-upload-localpath-pvc")]}{.spec.local.path}{end}'
-#   kubectl get pv -o jsonpath='{range .items[?(@.spec.claimRef.name=="jellyfin-media-localpath-pvc")]}{.spec.local.path}{end}'
+#   # Jellyfin: jellyfin-media-hostpath-pv → /Users/nila/movies (fixed 2026-06-02)
 #
-# Hardcoded paths as of 2026-05-30 (PVC UUIDs are stable until PVC recreation):
-#   immich-upload-localpath-pvc  → pvc-17ce78b9-de1e-4fe7-b2f0-214c599795d9
-#   jellyfin-media-localpath-pvc → pvc-663f38f5-a625-4dfb-bb7a-7b4e1442c1c2
+# Hardcoded paths as of 2026-06-02:
+#   immich-upload-localpath-pvc  → pvc-17ce78b9-de1e-4fe7-b2f0-214c599795d9 (local-path UUID)
+#   jellyfin ssd-jellyfin        → /Users/nila/movies (hostPath PV, not local-path)
 #
 # PREREQUISITE: HDD must be mounted at ${HOMELAB_TIER_HDD_PATH} with subdirs:
 #   ${HOMELAB_TIER_HDD_PATH}/immich-library/
@@ -83,7 +83,7 @@ data:
     JELLYFIN_SSD=/ssd-jellyfin
     JELLYFIN_HDD=/hdd-jellyfin
     JELLYFIN_POD_HDD=/media-hdd    # path as seen inside the Jellyfin pod
-    JELLYFIN_THRESHOLD_BYTES=3221225472  # 3 GiB
+    JELLYFIN_THRESHOLD_BYTES=1073741824  # 1 GiB
 
     # ---------------------------------------------------------------------------
     # Counters are tracked in /tmp files to survive the | while subshell.
@@ -245,9 +245,11 @@ data:
       echo "SUMMARY immich moved=$(read_counter immich moved) bytes=$(read_counter immich bytes) failed=$(read_counter immich failed) skipped=$(read_counter immich skipped)"
 
     elif [ "$APP" = "jellyfin" ]; then
-      # Process Jellyfin: movies/, tvshows/, music/
-      echo "=== Jellyfin: scanning movies/, tvshows/, music/ ==="
-      for subdir in movies tvshows music; do
+      # Process Jellyfin: all known media subdirs.
+      # NOTE: content lives in uncategorized/, english/, tamil/ (not in movies/).
+      # movies/, tvshows/, music/ are retained for forward-compat if new dirs are added.
+      echo "=== Jellyfin: scanning uncategorized/, english/, tamil/, movies/, tvshows/, music/ ==="
+      for subdir in uncategorized english tamil movies tvshows music; do
         src_dir="${JELLYFIN_SSD}/${subdir}"
         if [ ! -d "$src_dir" ]; then
           echo "SKIP dir-missing ${src_dir}"
@@ -421,11 +423,13 @@ spec:
                   mountPath: /scripts
 
           volumes:
-            # SSD — local-path PVC storage directory (hardcoded UUID, see above)
+            # SSD — direct hostPath to the actual media directory.
+            # Jellyfin uses jellyfin-media-hostpath-pv → /Users/nila/movies.
+            # (Previously pointed at the stale localpath-pvc UUID which was a
+            # different, empty volume; fixed 2026-06-02.)
             - name: ssd-jellyfin
               hostPath:
-                # jellyfin-media-localpath-pvc, PV pvc-663f38f5-a625-4dfb-bb7a-7b4e1442c1c2
-                path: /var/lib/rancher/k3s/storage/pvc-663f38f5-a625-4dfb-bb7a-7b4e1442c1c2_homelab_jellyfin-media-localpath-pvc
+                path: /Users/nila/movies
                 type: Directory
 
             # HDD — HFS+ disk, type: "" (no DirectoryOrCreate — see learnings)
