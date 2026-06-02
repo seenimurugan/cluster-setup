@@ -41,7 +41,9 @@ Expected: pods all `1/1 Running`, node `Ready`, all HTTPs `200`.
 | Docs server (`https://docs.stoat-perch.ts.net`) | ✅ Yes | nginx + Docsify pod, mounted on the docs folder |
 | launchd port-forward (`http://localhost:8096`, `:2283`) | ✅ Yes | Auto-loads from `~/Library/LaunchAgents/com.nila.homelab-localhost.plist` |
 | External HDD (`/Volumes/Seeni's HDD`) | ⚠️ Only if physically plugged in | If HDD not present → Jellyfin/Immich won't have media/upload storage; pods may crash. Plug HDD in **before** Mac boots, ideally. |
-| Weekly backup job | ✅ Yes, scheduled Sundays 03:00 | Won't run if backup HDD not mounted; logs error and skips |
+| Weekly backup job | ✅ Yes, scheduled Sundays 03:00 | Writes to `/Volumes/homelab-backup-hdd`. Won't run if that disk isn't mounted (logs error and skips). |
+
+> **Backups (updated 2026-06-02):** The weekly backup target is now **`homelab-backup-hdd`** (3 TB Journaled HFS+, always connected). Previously `backup-immich.sh` pointed at `/Volumes/Seeni's HDD`, which was no longer mounted — so the job had been **silently skipping every Sunday** (last fail 2026-05-31). Now fixed. The separate **`homelab-hdd`** disk is repurposed for **movies / drone footage / large files** and is *not* a backup target. HFS+ (not exFAT) is required for backup/cluster-mounted disks: journaled (crash-safe) + preserves Unix permissions.
 
 **Order on cold boot** (if you forget what to check):
 1. Mac boots.
@@ -174,6 +176,63 @@ pmset -g custom
 
 Full guide with reasoning, clamshell tips, and OrbStack `power.pause_in_sleep` settings: [MAC-ALWAYS-ON.md](MAC-ALWAYS-ON.md).
 
+### Operating rule — never stop the cluster
+
+The homelab is shared with family. Stopping it = visible outage. **Don't quit OrbStack, don't run `orb stop`, don't `kubectl scale --replicas=0`, don't `kubectl delete deployment/...`, don't drain the node** unless you've decided you're OK with an outage right now.
+
+- `kubectl rollout restart deployment/<x>` is the right tool for "make this pod re-read its config" — zero-downtime on multi-replica Deployments, ~10–30 s blip on single-replica.
+- If you must take something down, scope it tight (one Deployment, not the cluster) and time-box it.
+- After any planned restart, run section 0 health checks before walking away.
+
+### If the VM was found Stopped (Mac was NOT rebooted)
+
+Different from a Mac wake/reboot — this is "macOS is still up, OrbStack VM is Stopped". Happened on 2026-06-01 at 12:34 (root cause: most likely OrbStack app was quit or auto-paused; macOS uptime was 4 d at the time so it wasn't a sleep event).
+
+Symptoms:
+- `kubectl get nodes` → `connection refused` on `127.0.0.1:26443`
+- Every Tailnet URL (`*.stoat-perch.ts.net`) → not reachable
+- `orb status` → `Stopped`
+
+Diagnose before restarting (so you can fix the underlying cause):
+
+```bash
+# When did the VM stop, and was it clean?
+grep -E "shutting down|stopped|graceful|force|kill" ~/.orbstack/log/vmgr.log ~/.orbstack/log/vmgr.1.log 2>/dev/null | tail -20
+
+# Look for a clean shutdown trail:
+#   "scon ... shutting down"
+#   "Service ... exited: status 0"
+#   "Unmounting /data" / "Unmounting /mnt/mac"
+#   "reboot: Power down"
+#   "[VM] stopped"
+# If you see "graceful stop timed out, forcing" — something requested stop but the VM didn't drain in time.
+
+# Was the Mac asleep? (uptime should be days, not minutes)
+uptime
+last reboot | head -3
+
+# Is OrbStack still in login items?
+osascript -e 'tell application "System Events" to get the name of every login item' | tr ',' '\n' | grep -i orb
+```
+
+Likely causes (in order):
+1. **Someone quit OrbStack** from the menu bar or Cmd-Q'd the app. The VM is configured to stay up during sleep but quitting the app stops the VM.
+2. **`orb stop` was run** by a script or shell session.
+3. **OrbStack auto-updated** and restarted itself but didn't relaunch the VM.
+4. **macOS killed the helper** under memory pressure (rare; check `~/.orbstack/log/vmgr.log` and Console.app for `OrbStack Helper` crash reports around the stop timestamp).
+
+Restart:
+
+```bash
+orb start
+kubectl get nodes                  # should be Ready within ~30s
+kubectl get pods -A | grep -v Running | grep -v Completed   # check no pod is stuck
+```
+
+All Deployments self-recover (the cluster boots, pods schedule, Tailscale sidecars rejoin the tailnet). Sidecar restart counts will tick up by 1.
+
+If `orb start` says "already running" but `orb status` says `Stopped`, you're in the split state where the GUI is up but the VM is down — start the VM explicitly from the OrbStack menu bar → Kubernetes → Start, or `orbctl start`.
+
 ---
 
 ## 2. Where everything lives
@@ -190,10 +249,11 @@ Full guide with reasoning, clamshell tips, and OrbStack `power.pause_in_sleep` s
 | `~/homelab/docs-server.yaml` | Docs site nginx + Docsify + Tailscale Ingress |
 | `~/homelab/localhost-portforward.sh` | Port-forward script (auto-run by launchd) |
 | `~/homelab/refresh-localhost.sh` | Manual port-forward reload |
-| `~/homelab/backup-immich.sh` | Weekly backup script |
+| `~/homelab/backup-immich.sh` | Weekly backup script (writes to `/Volumes/homelab-backup-hdd/backups`) |
 | `~/Library/LaunchAgents/com.nila.homelab-localhost.plist` | launchd: port-forward at login |
 | `~/Library/LaunchAgents/com.nila.homelab-backup.plist` | launchd: weekly backup |
-| `/Volumes/Seeni's HDD/` | External HDD: media + photo blobs |
+| `/Volumes/homelab-backup-hdd/` | **Primary backup target** (3 TB Journaled HFS+, always connected) — weekly Immich/Postgres/Jellyfin `.tar.zst` backups |
+| `/Volumes/homelab-hdd/` | Media / large-files disk (movies, drone footage) — plugged in occasionally; **not** a backup target |
 
 ### Documentation
 - `/Users/nila/Developer/agents/docs/homelab-k8s-setup/` — all docs
