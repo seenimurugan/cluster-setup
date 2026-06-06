@@ -8,7 +8,7 @@ if ! command -v brew &>/dev/null; then
   exit 1
 fi
 
-REQUIRED=(kubectl helm gh jq gettext git zstd tailscale immich-go)
+REQUIRED=(kubectl helm gh jq gettext git zstd tailscale immich-go age kubeseal)
 
 echo "[prereqs] Ensuring brew packages: ${REQUIRED[*]}"
 for pkg in "${REQUIRED[@]}"; do
