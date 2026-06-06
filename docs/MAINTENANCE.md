@@ -41,9 +41,9 @@ Expected: pods all `1/1 Running`, node `Ready`, all HTTPs `200`.
 | Docs server (`https://docs.stoat-perch.ts.net`) | ✅ Yes | nginx + Docsify pod, mounted on the docs folder |
 | launchd port-forward (`http://localhost:8096`, `:2283`) | ✅ Yes | Auto-loads from `~/Library/LaunchAgents/com.nila.homelab-localhost.plist` |
 | External HDD (`/Volumes/Seeni's HDD`) | ⚠️ Only if physically plugged in | If HDD not present → Jellyfin/Immich won't have media/upload storage; pods may crash. Plug HDD in **before** Mac boots, ideally. |
-| Weekly backup job | ✅ Yes, scheduled Sundays 03:00 | Writes to `/Volumes/homelab-backup-hdd`. Won't run if that disk isn't mounted (logs error and skips). |
+| Backups | ⚙️ **Manual only** (no schedule) | Immich (restic), all DBs, and secrets are triggered on demand from the storage-console dashboard. See **[Backups & DR](BACKUP.md)**. |
 
-> **Backups (updated 2026-06-02):** The weekly backup target is now **`homelab-backup-hdd`** (3 TB Journaled HFS+, always connected). Previously `backup-immich.sh` pointed at `/Volumes/Seeni's HDD`, which was no longer mounted — so the job had been **silently skipping every Sunday** (last fail 2026-05-31). Now fixed. The separate **`homelab-hdd`** disk is repurposed for **movies / drone footage / large files** and is *not* a backup target. HFS+ (not exFAT) is required for backup/cluster-mounted disks: journaled (crash-safe) + preserves Unix permissions.
+> **Backups (updated 2026-06-06):** Backups are now **manual** (this Mac is a laptop, not always on at a fixed hour). Immich is backed up with **restic**, all databases via the `db-backup` job, and secrets two ways (offline `age` dump + committed SealedSecrets) — all to **`homelab-backup-hdd`** (3 TB Journaled HFS+). The old weekly `backup-immich.sh` launchd job is **retired/disabled**. Full details, trigger steps, and restore runbooks are in **[Backups & DR](BACKUP.md)**. The separate **`homelab-hdd`** disk holds movies / large files and is *not* a backup target. HFS+ (not exFAT) is required for backup/cluster-mounted disks: journaled (crash-safe) + preserves Unix permissions.
 
 **Order on cold boot** (if you forget what to check):
 1. Mac boots.
@@ -249,10 +249,10 @@ If `orb start` says "already running" but `orb status` says `Stopped`, you're in
 | `~/homelab/docs-server.yaml` | Docs site nginx + Docsify + Tailscale Ingress |
 | `~/homelab/localhost-portforward.sh` | Port-forward script (auto-run by launchd) |
 | `~/homelab/refresh-localhost.sh` | Manual port-forward reload |
-| `~/homelab/backup-immich.sh` | Weekly backup script (writes to `/Volumes/homelab-backup-hdd/backups`) |
+| `~/homelab/backup-immich.sh` | **Retired** legacy host tar backup (superseded by restic + db-backup; launchd disabled). See [Backups & DR](BACKUP.md). |
 | `~/Library/LaunchAgents/com.nila.homelab-localhost.plist` | launchd: port-forward at login |
-| `~/Library/LaunchAgents/com.nila.homelab-backup.plist` | launchd: weekly backup |
-| `/Volumes/homelab-backup-hdd/` | **Primary backup target** (3 TB Journaled HFS+, always connected) — weekly Immich/Postgres/Jellyfin `.tar.zst` backups |
+| `~/Library/LaunchAgents/com.nila.homelab-backup.plist.disabled` | launchd: weekly backup — **disabled/retired** |
+| `/Volumes/homelab-backup-hdd/` | **Primary backup target** (3 TB Journaled HFS+) — restic Immich repo, DB dumps, and `age` secret dumps. See [Backups & DR](BACKUP.md). |
 | `/Volumes/homelab-hdd/` | Media / large-files disk (movies, drone footage) — plugged in occasionally; **not** a backup target |
 
 ### Documentation
@@ -444,12 +444,13 @@ See **`IMMICH-BULK-UPLOAD.md`**. Quick form:
 immich upload --recursive --concurrency 4 "/path/to/photos"
 ```
 
-### Run the backup manually
+### Run a backup manually
+All backups are manual now — trigger from the storage-console dashboard (<https://tier.stoat-perch.ts.net>) or via:
 ```bash
-bash ~/homelab/backup-immich.sh
-tail ~/homelab/backup.log
+kubectl -n homelab create job --from=cronjob/immich-backup immich-backup-manual-$(date +%s)
+kubectl -n homelab create job --from=cronjob/db-backup     db-backup-manual-$(date +%s)
 ```
-(Edit the script to set `BACKUP_HDD` to the actual mount path of your backup drive first.)
+Full trigger/restore steps and what each backup covers: **[Backups & DR](BACKUP.md)**. (The old `~/homelab/backup-immich.sh` is retired.)
 
 ### Upgrade Immich to a newer version
 See **`IMMICH-UPGRADE.md`**. Quick form:
