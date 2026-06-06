@@ -82,7 +82,23 @@ scripts/tier-now.sh immich         # one-shot tiered-storage move (Immich)
 scripts/tier-now.sh jellyfin       # ditto (Jellyfin)
 scripts/tier-now.sh backup         # one-shot backup-immich
 scripts/refresh-localhost.sh       # reload the localhost port-forward LaunchAgent
+scripts/backup-secrets.sh          # encrypted offline DR dump of ALL secrets (age)
+scripts/install-sealed-secrets.sh  # install the sealed-secrets controller (kube-system)
 ```
+
+## Secrets disaster recovery
+
+Two layers protect every Secret — see [`secrets-dr/README.md`](secrets-dr/README.md):
+
+- **(a) Encrypted offline dump** — `scripts/backup-secrets.sh` `age`-encrypts all
+  secrets to `secrets-dr/age-recipient.pub` and writes
+  `$HOMELAB_HDD_PATH/backups/secrets/secrets-<date>.age`. The matching PRIVATE
+  key lives OFFLINE at `~/homelab-secrets-age-key.txt` (never in git).
+- **(b) Sealed-secrets** — the bitnami-labs controller in `kube-system`
+  (install via `scripts/install-sealed-secrets.sh`) materializes Secrets from
+  `SealedSecret` YAMLs each app repo commits under `k8s/sealed/`. The
+  controller's sealing key in `kube-system` is DR-CRITICAL and is captured by
+  `backup-secrets.sh`.
 
 ## Migrating to a new Mac
 
