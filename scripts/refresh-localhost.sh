@@ -6,20 +6,11 @@
 
 set -uo pipefail
 
-# Load parent .env for USER_NAME (used in the LaunchAgent Label)
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ENV_FILE="${SCRIPT_DIR}/../.env"
-if [ -f "$ENV_FILE" ]; then
-  set -a; source "$ENV_FILE"; set +a
-fi
-: "${USER_NAME:=$USER}"
-PLIST="$HOME/Library/LaunchAgents/com.${USER_NAME}.homelab-localhost.plist"
-
 echo "[homelab] Refreshing localhost port-forward..."
-launchctl unload "$PLIST" 2>/dev/null
+launchctl unload ~/Library/LaunchAgents/com.nila.homelab-localhost.plist 2>/dev/null
 pkill -f "kubectl port-forward" 2>/dev/null
 sleep 2
-launchctl load "$PLIST"
+launchctl load ~/Library/LaunchAgents/com.nila.homelab-localhost.plist
 sleep 4
 
 echo ""

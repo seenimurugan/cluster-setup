@@ -6,16 +6,6 @@
 
 set -u
 
-# Load parent .env (cluster-setup/.env) so HOMELAB_HDD_PATH / USER_HOME work
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ENV_FILE="${SCRIPT_DIR}/../.env"
-if [ -f "$ENV_FILE" ]; then
-  # shellcheck disable=SC1090
-  set -a; source "$ENV_FILE"; set +a
-fi
-: "${HOMELAB_HDD_PATH:=/Volumes/Seeni's HDD}"
-: "${USER_HOME:=$HOME}"
-
 LOGDIR="$HOME/homelab/uploads"
 WLOG="$LOGDIR/auto-delete.log"
 exec >> "$WLOG" 2>&1
@@ -37,9 +27,9 @@ tail -n 0 -F "$LOGDIR/stream-a.log" "$LOGDIR/stream-b.log" 2>/dev/null | \
         path=${path% (exit *}               # strip " (exit N)"
         # Trim trailing whitespace too
         path="${path%"${path##*[![:space:]]}"}"
-        # Be defensive: must start with ${HOMELAB_HDD_PATH}/
+        # Be defensive: must start with /Volumes/Seeni's HDD/
         case "$path" in
-          "${HOMELAB_HDD_PATH}/"*)
+          "/Volumes/Seeni's HDD/"*)
             if [ -d "$path" ]; then
               size=$(du -sh "$path" 2>/dev/null | cut -f1)
               echo "[$(ts)] Deleting completed folder ($size): $path"

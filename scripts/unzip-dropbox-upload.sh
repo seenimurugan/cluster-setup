@@ -6,16 +6,6 @@
 
 set -u
 
-# Load parent .env (cluster-setup/.env) so HOMELAB_HDD_PATH / USER_HOME work
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ENV_FILE="${SCRIPT_DIR}/../.env"
-if [ -f "$ENV_FILE" ]; then
-  # shellcheck disable=SC1090
-  set -a; source "$ENV_FILE"; set +a
-fi
-: "${HOMELAB_HDD_PATH:=/Volumes/Seeni's HDD}"
-: "${USER_HOME:=$HOME}"
-
 LOGDIR="$HOME/homelab/uploads"
 mkdir -p "$LOGDIR"
 LOG="$LOGDIR/dropbox-unzip.log"
@@ -28,8 +18,8 @@ TEMPDIR="$HOME/Pictures/_dropbox_unzipped"
 mkdir -p "$TEMPDIR"
 
 ZIPS=(
-  "${USER_HOME}/Pictures/Dropbox (1).zip"
-  "${USER_HOME}/Pictures/Dropbox (2).zip"
+  "/Users/nila/Pictures/Dropbox (1).zip"
+  "/Users/nila/Pictures/Dropbox (2).zip"
 )
 
 log "=== Dropbox unzip + upload START ==="

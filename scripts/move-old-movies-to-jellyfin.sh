@@ -5,18 +5,8 @@
 
 set -euo pipefail
 
-# Load parent .env (cluster-setup/.env) so HOMELAB_HDD_PATH / USER_HOME work
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ENV_FILE="${SCRIPT_DIR}/../.env"
-if [ -f "$ENV_FILE" ]; then
-  # shellcheck disable=SC1090
-  set -a; source "$ENV_FILE"; set +a
-fi
-: "${HOMELAB_HDD_PATH:=/Volumes/Seeni's HDD}"
-: "${USER_HOME:=$HOME}"
-
 LOG="$HOME/homelab/uploads/move-old-movies.log"
-SOURCE="${USER_HOME}/Pictures/old_movies"
+SOURCE="/Users/nila/Pictures/old_movies"
 NAMESPACE=homelab
 exec >> "$LOG" 2>&1
 

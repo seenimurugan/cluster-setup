@@ -18,16 +18,8 @@
 
 set -euo pipefail
 
-# Load parent .env so HOMELAB_TIER_HDD_PATH / HOMELAB_NAMESPACE are available.
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ENV_FILE="${SCRIPT_DIR}/../.env"
-if [ -f "$ENV_FILE" ]; then
-  # shellcheck disable=SC1090
-  set -a; source "$ENV_FILE"; set +a
-fi
-
-NS="${HOMELAB_NAMESPACE:-homelab}"
-HDD_ROOT="${HOMELAB_TIER_HDD_PATH:-/Volumes/homelab-hdd}"
+NS=homelab
+HDD_ROOT=/Volumes/homelab-hdd
 
 # ----------------------------------------------------------------------
 # Argument parsing
@@ -78,11 +70,11 @@ if [ "$NEED_MOVER_DIRS" = "true" ]; then
       fi
   done
 else
-  # Backup job writes to ${HDD_ROOT}/backups
+  # Backup job writes to /Volumes/homelab-hdd/backups
   if [ ! -d "${HDD_ROOT}/backups" ]; then
       echo "ERROR: ${HDD_ROOT}/backups missing."
-      echo "       mkdir -p ${HDD_ROOT}/backups/postgres"
-      echo "       mkdir -p ${HDD_ROOT}/backups/library"
+      echo "       mkdir -p /Volumes/homelab-hdd/backups/postgres"
+      echo "       mkdir -p /Volumes/homelab-hdd/backups/library"
       exit 1
   fi
 fi
