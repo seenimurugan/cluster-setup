@@ -91,7 +91,7 @@ fi
 #    good archive.
 # ============================================================================
 
-IMMICH_POD=$("$KUBECTL" get pods -n "$NAMESPACE" -l app.kubernetes.io/name=immich,app.kubernetes.io/component=server \
+IMMICH_POD=$("$KUBECTL" get pods -n "$NAMESPACE" -l app.kubernetes.io/instance=immich,app.kubernetes.io/name=server \
   --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
 if [ -z "$IMMICH_POD" ]; then
   IMMICH_POD=$("$KUBECTL" get pods -n "$NAMESPACE" -l app=immich-server \
