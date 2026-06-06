@@ -5,16 +5,6 @@
 
 set -u
 
-# Load parent .env (cluster-setup/.env) so HOMELAB_HDD_PATH / USER_HOME work
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ENV_FILE="${SCRIPT_DIR}/../.env"
-if [ -f "$ENV_FILE" ]; then
-  # shellcheck disable=SC1090
-  set -a; source "$ENV_FILE"; set +a
-fi
-: "${HOMELAB_HDD_PATH:=/Volumes/Seeni's HDD}"
-: "${USER_HOME:=$HOME}"
-
 LOGDIR="$HOME/homelab/uploads"
 mkdir -p "$LOGDIR"
 
@@ -52,7 +42,7 @@ upload_one() {
 }
 
 stream_g() {
-  upload_one "${USER_HOME}/Pictures/_unzipped"
+  upload_one "/Users/nila/Pictures/_unzipped"
 }
 
 ( stream_g 2>&1 | tee "$LOGDIR/stream-g.log" )

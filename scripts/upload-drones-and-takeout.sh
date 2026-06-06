@@ -5,16 +5,6 @@
 
 set -u
 
-# Load parent .env (cluster-setup/.env) so HOMELAB_HDD_PATH / USER_HOME work
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ENV_FILE="${SCRIPT_DIR}/../.env"
-if [ -f "$ENV_FILE" ]; then
-  # shellcheck disable=SC1090
-  set -a; source "$ENV_FILE"; set +a
-fi
-: "${HOMELAB_HDD_PATH:=/Volumes/Seeni's HDD}"
-: "${USER_HOME:=$HOME}"
-
 LOGDIR="$HOME/homelab/uploads"
 mkdir -p "$LOGDIR"
 
@@ -53,14 +43,14 @@ upload_one() {
 
 stream_e() {
   # Drone HDD folders — order largest-first so the long one runs first
-  upload_one "${HOMELAB_HDD_PATH}/DJI Avata old"
-  upload_one "${HOMELAB_HDD_PATH}/dji mini 2 videos"
-  upload_one "${HOMELAB_HDD_PATH}/dji Avataa old 1"
-  upload_one "${HOMELAB_HDD_PATH}/DJI_001"
+  upload_one "/Volumes/Seeni's HDD/DJI Avata old"
+  upload_one "/Volumes/Seeni's HDD/dji mini 2 videos"
+  upload_one "/Volumes/Seeni's HDD/dji Avataa old 1"
+  upload_one "/Volumes/Seeni's HDD/DJI_001"
 }
 
 stream_f() {
-  upload_one "${USER_HOME}/Pictures/from google storage full"
+  upload_one "/Users/nila/Pictures/from google storage full"
 }
 
 ( stream_e 2>&1 | tee "$LOGDIR/stream-e.log" ) &
@@ -74,4 +64,4 @@ echo "Stream F pid=$F_PID  → tail $LOGDIR/stream-f.log  (google takeout, SSD)"
 wait $E_PID
 wait $F_PID
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] === DRONES + TAKEOUT UPLOAD DONE ==="
-df -h "${HOMELAB_HDD_PATH}" / | grep -vE "Filesystem|iboot"
+df -h "/Volumes/Seeni's HDD" / | grep -vE "Filesystem|iboot"

@@ -7,15 +7,8 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ENV_FILE="${SCRIPT_DIR}/../.env"
-if [ -f "$ENV_FILE" ]; then
-  # shellcheck disable=SC1090
-  set -a; source "$ENV_FILE"; set +a
-fi
-
-NAMESPACE="${HOMELAB_NAMESPACE:-homelab}"
-TAILSCALE_BIN="${TAILSCALE_BIN:-/Applications/Tailscale.app/Contents/MacOS/Tailscale}"
+NAMESPACE="homelab"
+TAILSCALE_BIN="/Applications/Tailscale.app/Contents/MacOS/Tailscale"
 TS_IP="$($TAILSCALE_BIN ip -4)"
 
 echo "[homelab] Tailscale IP: $TS_IP"

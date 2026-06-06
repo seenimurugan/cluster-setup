@@ -2,7 +2,7 @@
 
 Everything you need to operate the homelab without Claude. Read top-down when something's wrong; jump to specific sections for routine tasks.
 
-**On this page:** [0. Quick health check (run first when anything seems wrong)](#0-quick-health-check-run-first-when-anything-seems-wrong) · [1. After a Mac reboot — what auto-recovers](#1-after-a-mac-reboot--what-auto-recovers) · [2. Where everything lives](#2-where-everything-lives) · [3. Restart things (smallest to biggest blast radius)](#3-restart-things-smallest-to-biggest-blast-radius) · [4. Scale things](#4-scale-things) · [5. Where to find logs](#5-where-to-find-logs) · [6. Stuck things — diagnosis flowchart](#6-stuck-things--diagnosis-flowchart) · [7. Routine tasks](#7-routine-tasks) · [8. Reach the services](#8-reach-the-services) · [9. Managing content on the docs site](#9-managing-content-on-the-docs-site) · [10. The "everything broke, start over" nuclear option](#10-the-everything-broke-start-over-nuclear-option) · [11. Cheat sheet — most-used commands](#11-cheat-sheet--most-used-commands)
+**On this page:** [0. Quick health check (run first when anything seems wrong)](#0-quick-health-check-run-first-when-anything-seems-wrong) · [1. After a Mac reboot — what auto-recovers](#1-after-a-mac-reboot--what-auto-recovers) · [2. Where everything lives](#2-where-everything-lives) · [3. Restart things (smallest to biggest blast radius)](#3-restart-things-smallest-to-biggest-blast-radius) · [4. Scale things](#4-scale-things) · [5. Where to find logs](#5-where-to-find-logs) · [6. Stuck things — diagnosis flowchart](#6-stuck-things--diagnosis-flowchart) · [7. Routine tasks](#7-routine-tasks) · [8. Reach the services](#8-reach-the-services) · [9. Managing content on the docs site](#9-managing-content-on-the-docs-site) · [10. The "everything broke, start over" nuclear option](#10-the-everything-broke-start-over-nuclear-option) · [11. Cheat sheet — most-used commands](#11-cheat-sheet--most-used-commands) · [12. Bootstrap dependencies](#12-bootstrap-dependencies--what-must-be-true-on-a-fresh-mac)
 
 ---
 
@@ -720,4 +720,75 @@ du -sh "/Volumes/Seeni's HDD/immich/upload/library/"
 # Clean macOS metadata (run after Finder touches the HDD)
 find "/Volumes/Seeni's HDD" -name "._*" -type f -delete
 find "/Volumes/Seeni's HDD" -name ".DS_Store" -type f -delete
+```
+
+---
+
+## 12. Bootstrap dependencies — what must be true on a fresh Mac
+
+### Tailscale MagicDNS resolver (`/etc/resolver/stoat-perch.ts.net`)
+
+The homelab cluster uses Tailscale Ingress for external HTTPS access (`*.stoat-perch.ts.net`). Cluster-internal DNS (`*.homelab.svc.cluster.local`) also flows through OrbStack's resolver. When you clone this repo onto a new Mac, the Tailscale app must be installed and connected to the tailnet **before** running `deploy.sh`.
+
+**What happens automatically:** The Tailscale app writes `/etc/resolver/stoat-perch.ts.net` (via MagicDNS) when you sign in. This file tells macOS to route `*.stoat-perch.ts.net` queries to the Tailscale DNS resolver.
+
+**You do not create this file manually.** Install Tailscale → sign in → MagicDNS auto-creates the resolver.
+
+```bash
+# Verify the resolver is in place
+cat /etc/resolver/stoat-perch.ts.net
+# Expected output (nameserver pointing to 100.100.100.100 — the Tailscale MagicDNS IP):
+#   nameserver 100.100.100.100
+
+# If the file is missing: open Tailscale app, sign in, enable MagicDNS in the admin console.
+# https://login.tailscale.com/admin/dns  →  Enable MagicDNS toggle
+```
+
+If `*.stoat-perch.ts.net` URLs don't resolve on a new Mac after Tailscale is installed:
+1. Check `tailscale status` — must be `Connected`
+2. Check `ls /etc/resolver/` — the `stoat-perch.ts.net` file must exist
+3. Check Tailscale admin console → DNS → MagicDNS is enabled
+
+### launchd jobs and the `~/homelab/` scripts
+
+Two launchd agents manage always-on background tasks:
+
+| plist | What it runs | How often |
+|---|---|---|
+| `~/Library/LaunchAgents/com.USER_NAME.homelab-localhost.plist` | `~/homelab/localhost-portforward.sh` | At login; restarts if killed |
+| `~/Library/LaunchAgents/com.USER_NAME.homelab-backup.plist` | `~/homelab/backup-immich.sh` | Sundays at 03:00 |
+
+**Critical:** The plist files reference `~/homelab/<script>.sh` directly (not the repo path). This means:
+
+- The `~/homelab/` copies are what actually runs on the cluster.
+- The repo copies in `cluster-setup/scripts/` are the source-of-truth for version control.
+- **After merging any script changes, copy the updated file to `~/homelab/` and reload the launchd agent:**
+
+```bash
+# Example: update localhost-portforward.sh
+cp /path/to/cluster-setup/scripts/localhost-portforward.sh ~/homelab/localhost-portforward.sh
+~/homelab/refresh-localhost.sh    # reload the launchd agent
+
+# Or for backup script (no reload needed — launchd runs it on schedule):
+cp /path/to/cluster-setup/scripts/backup-immich.sh ~/homelab/backup-immich.sh
+```
+
+On a fresh Mac (new clone), after running `deploy.sh`, copy all scripts from `cluster-setup/scripts/` to `~/homelab/`:
+```bash
+cp cluster-setup/scripts/*.sh ~/homelab/
+# Install plist files from cluster-setup/launchd/
+cp cluster-setup/launchd/com.USER_NAME.homelab-localhost.plist ~/Library/LaunchAgents/
+cp cluster-setup/launchd/com.USER_NAME.homelab-backup.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.USER_NAME.homelab-localhost.plist
+launchctl load ~/Library/LaunchAgents/com.USER_NAME.homelab-backup.plist
+```
+
+### Host `~/homelab/storage.yaml` and `~/homelab/ingress.yaml` — DEPRECATED
+
+The monolithic `~/homelab/storage.yaml` and `~/homelab/ingress.yaml` files are **superseded** by the parameterized versions in this repo:
+
+- `cluster-setup/30-storage.yaml` — replaces `~/homelab/storage.yaml` (uses `${HOMELAB_HDD_PATH}` / `${HOMELAB_NAMESPACE}`)
+- `cluster-setup/40-ingress.yaml` — replaces `~/homelab/ingress.yaml` (uses `${HOMELAB_NAMESPACE}`)
+
+The host copies predate the portable-repo migration and use hardcoded paths (`/Volumes/Seeni's HDD`, namespace `homelab`). Do **not** apply the host monoliths on a new cluster — use `deploy.sh` from this repo, which applies the parameterized versions via `envsubst`.
 ```

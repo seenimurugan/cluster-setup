@@ -14,16 +14,6 @@
 
 set -u
 
-# Load parent .env (cluster-setup/.env) so HOMELAB_HDD_PATH / USER_HOME work
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ENV_FILE="${SCRIPT_DIR}/../.env"
-if [ -f "$ENV_FILE" ]; then
-  # shellcheck disable=SC1090
-  set -a; source "$ENV_FILE"; set +a
-fi
-: "${HOMELAB_HDD_PATH:=/Volumes/Seeni's HDD}"
-: "${USER_HOME:=$HOME}"
-
 LOGDIR="$HOME/homelab/uploads"
 mkdir -p "$LOGDIR"
 
@@ -70,13 +60,13 @@ stream_c() {
   # Upload from /originals (where the photos actually live), then delete the
   # WHOLE .photoslibrary bundle (originals + database + metadata caches).
   upload_one \
-    "${USER_HOME}/Pictures/Photos Library.photoslibrary/originals" \
-    "${USER_HOME}/Pictures/Photos Library.photoslibrary"
+    "/Users/nila/Pictures/Photos Library.photoslibrary/originals" \
+    "/Users/nila/Pictures/Photos Library.photoslibrary"
 }
 
 stream_d() {
-  upload_one "${USER_HOME}/Pictures/Nithi iphone large photos"
-  upload_one "${USER_HOME}/Pictures/portable printer photos and video"
+  upload_one "/Users/nila/Pictures/Nithi iphone large photos"
+  upload_one "/Users/nila/Pictures/portable printer photos and video"
 }
 
 ( stream_c 2>&1 | tee "$LOGDIR/stream-c.log" ) &

@@ -5,16 +5,6 @@
 
 set -u
 
-# Load parent .env (cluster-setup/.env) so HOMELAB_HDD_PATH / USER_HOME work
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ENV_FILE="${SCRIPT_DIR}/../.env"
-if [ -f "$ENV_FILE" ]; then
-  # shellcheck disable=SC1090
-  set -a; source "$ENV_FILE"; set +a
-fi
-: "${HOMELAB_HDD_PATH:=/Volumes/Seeni's HDD}"
-: "${USER_HOME:=$HOME}"
-
 LOGDIR="$HOME/homelab/uploads"
 mkdir -p "$LOGDIR"
 
@@ -30,15 +20,15 @@ upload_one() {
 }
 
 stream_a() {
-  upload_one "${HOMELAB_HDD_PATH}/Kuttima school photos"
-  upload_one "${HOMELAB_HDD_PATH}/Pictures"
-  upload_one "${HOMELAB_HDD_PATH}/Nithi Iphone 25-02-2023"
+  upload_one "/Volumes/Seeni's HDD/Kuttima school photos"
+  upload_one "/Volumes/Seeni's HDD/Pictures"
+  upload_one "/Volumes/Seeni's HDD/Nithi Iphone 25-02-2023"
 }
 
 stream_b() {
-  upload_one "${HOMELAB_HDD_PATH}/100MEDIA"
-  upload_one "${HOMELAB_HDD_PATH}/Seeni Iphone 25-02-2023"
-  upload_one "${HOMELAB_HDD_PATH}/Photos and videos"
+  upload_one "/Volumes/Seeni's HDD/100MEDIA"
+  upload_one "/Volumes/Seeni's HDD/Seeni Iphone 25-02-2023"
+  upload_one "/Volumes/Seeni's HDD/Photos and videos"
 }
 
 ( stream_a 2>&1 | tee "$LOGDIR/stream-a.log" ) &

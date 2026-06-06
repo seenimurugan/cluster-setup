@@ -6,15 +6,7 @@
 
 set -euo pipefail
 
-# Load parent .env (cluster-setup/.env) if present, so HOMELAB_NAMESPACE wins
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ENV_FILE="${SCRIPT_DIR}/../.env"
-if [ -f "$ENV_FILE" ]; then
-  # shellcheck disable=SC1090
-  set -a; source "$ENV_FILE"; set +a
-fi
-
-NAMESPACE="${HOMELAB_NAMESPACE:-homelab}"
+NAMESPACE="homelab"
 
 echo "[homelab] Port-forwards starting..."
 
