@@ -67,11 +67,20 @@ Confirm:
 
 ```bash
 ls /Volumes/homelab-hdd/
-# backups  immich-library  jellyfin-media
+# backups  immich-library  jellyfin-media  "security camera recordings"
 
 ls /Volumes/homelab-hdd/backups/
 # library  postgres
 ```
+
+> **Top-level folder reference**
+>
+> | Folder | Contents |
+> |---|---|
+> | `immich-library/` | Tiered Immich photo/video files (>2 GB) |
+> | `jellyfin-media/` | Tiered Jellyfin media files (>3 GB) |
+> | `backups/` | Weekly Postgres dumps + library backups |
+> | `security camera recordings/` | 7,402 Sept–Oct 2019 CCTV clips archived from Immich on 2026-06-02 (~57.86 GB, 28 date subfolders 2019-09-22 … 2019-10-20) |
 
 The `backups/` tree is required by the `immich-backup` CronJob, which mounts
 `/Volumes/homelab-hdd/backups` as a hostPath volume (type `""`). The script
