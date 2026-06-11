@@ -20,6 +20,7 @@ Self-hosted homelab on Nila's Mac running OrbStack k3s. All captured knowledge l
 - ➕ [Add a new app](ADD-NEW-APP.md) — runbook for deploying anything new
 - 🌐 [Tailscale Funnel](TAILSCALE-FUNNEL.md) — expose apps to the internet via Funnel; Serve vs Funnel, ACL setup, troubleshooting
 - 🏛 [Architecture](architecture.md) + [Excalidraw diagram](architecture.excalidraw)
+- 🚀 [Bring-up runbook](BRING-UP.md) — stand up the full stack on a new machine (deploy order, Umami wiring, admin-console prereqs)
 
 ### Reference
 - 🧠 [Learnings](learnings.md) — gotchas, tribal knowledge
