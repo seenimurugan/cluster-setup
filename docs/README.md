@@ -18,6 +18,7 @@ Self-hosted homelab on Nila's Mac running OrbStack k3s. All captured knowledge l
 ### Cluster-wide (one-stop)
 - 🛠 [Maintenance](MAINTENANCE.md) — health checks, restart, scale, stuck things, cheat sheet
 - ➕ [Add a new app](ADD-NEW-APP.md) — runbook for deploying anything new
+- 🌐 [Tailscale Funnel](TAILSCALE-FUNNEL.md) — expose apps to the internet via Funnel; Serve vs Funnel, ACL setup, troubleshooting
 - 🏛 [Architecture](architecture.md) + [Excalidraw diagram](architecture.excalidraw)
 
 ### Reference
